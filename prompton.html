@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>족발보쌈</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.2/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        .header h1 {
+            color: #942908;
+            margin-right: 10px;
+            font-size: 60px;
+        }
+        .upload-container {
+            margin: 35px auto;  /* 50px에서 35px로 수정 */
+            width: 100%;
+            max-width: 800px;
+            border: 2px dashed #942908;
+            border-radius: 10px;
+            text-align: center;
+            padding: 50px;
+            background-color: #f8f9fa;
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+        .upload-container:hover {
+            border-color: #6c757d;
+            background-color: #e9ecef;
+        }
+        .upload-icon {
+            margin-bottom: 20px;
+        }
+        .upload-icon img {
+            width: 60px;
+        }
+        .upload-text {
+            font-size: 16px;
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+        .custom-file-input {
+            display: none;
+        }
+        .custom-file-label {
+            display: inline-block;
+            cursor: pointer;
+            padding: 6px 12px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 16px;
+            height: 38px;
+            line-height: 24px;
+            min-width: 120px;
+        }
+        .custom-file-label:hover {
+            background-color: #0056b3;
+        }
+        .btn-upload {
+            height: 38px;
+            line-height: 24px;
+            min-width: 120px;
+            margin-top: 15px;
+        }
+        .upload-container form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        .input-container {
+            margin: 15px auto;  /* 30px에서 15px로 수정 */
+            width: 100%;
+            max-width: 800px;
+            border: 2px dashed #942908;
+            border-radius: 10px;
+            text-align: center;
+            padding: 40px;
+            background-color: #f8f9fa;
+        }
+        .input-container input {
+            margin-bottom: 15px;
+        }
+        
+        /* 팝업 스타일 */
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+            width: 80%;
+            max-width: 600px;
+        }
+        .popup h2 {
+            color: #942908;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .popup .form-group {
+            margin-bottom: 15px;
+        }
+        .popup label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .popup input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .popup .divider {
+            border-top: 2px dashed #942908;
+            margin: 20px 0;
+        }
+        .close-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #942908;
+            background: none;
+            border: none;
+            padding: 5px;
+            line-height: 1;
+        }
+        .close-button:hover {
+            color: #6c757d;
+        }
+        #upload-message {
+            font-size: 14px;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+            margin-top: 10px;
+        }
+        /* 로딩 스피너 스타일 추가 */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .btn-upload:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        .btn-disabled {
+            background-color: #6c757d !important;
+            border-color: #6c757d !important;
+            cursor: not-allowed;
+            opacity: 0.65;
+        }
+
+        .btn-gold {
+            background-color: #FFD700 !important;
+            border-color: #FFD700 !important;
+            color: #000 !important;
+        }
+
+        .btn-gold:hover {
+            background-color: #FFC800 !important;
+            border-color: #FFC800 !important;
+        }
+    </style>
+    
+    <script>
+        const BACKEND_URL = 'https://haseojin.pythonanywhere.com';
+        // 문제 만들기 버튼 클릭 시 실행되는 함수
+        function handleSubmit(event) {
+            event.preventDefault();
+            showPopup();
+            return false;
+        }
+    
+        function showPopup() {
+            const popup = document.createElement('div');
+            popup.className = 'popup';
+            popup.innerHTML = `
+                <button class="close-button">&times;</button>
+                <h2>🎉 문제 생성 설정 🎉</h2>
+                <form id="problemSettingsForm">
+                    <div class="form-group">
+                        <label for="api_key">API_KEY</label>
+                        <input type="text" id="api_key" name="api_key" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="project_code">PROJECT_CODE</label>
+                        <input type="text" id="project_code" name="project_code" required>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="form-group">
+                        <label for="subject">과목명</label>
+                        <input type="text" id="subject" name="subject" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="topic_num">토픽 수(꼭 토픽 수만큼 토픽이 생성되지는 않습니다)</label>
+                        <input type="number" id="topic_num" name="topic_num" value="5">
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="form-group">
+                        <label for="number">문제 개수</label>
+                        <input type="number" id="number" name="number" value="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="type">문제 종류</label>
+                        <input type="text" id="type" name="type" value="5지선다 객관식">
+                    </div>
+                    <div class="form-group">
+                        <label for="level">난이도</label>
+                        <input type="text" id="level" name="level" value="보통">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 mt-3">문제 생성 하기</button>
+                </form>
+                <div id="keywords-result" style="display: none; margin-top: 20px;">
+                    <h3>추출된 키워드</h3>
+                    <div id="keywords-content"></div>
+                    <button type="button" class="btn btn-success w-100 mt-3" onclick="generateProblems()">문제 생성하기</button>
+                </div>
+            `;
+            document.body.appendChild(popup);
+    
+            // 닫기 버튼 이벤트
+            const closeButton = popup.querySelector('.close-button');
+            closeButton.addEventListener('click', () => {
+                document.body.removeChild(popup);
+            });
+
+            // 폼 제출 이벤트 처리
+            const form = popup.querySelector('#problemSettingsForm');
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData.entries());
+                
+                const submitButton = e.target.querySelector('button[type="submit"]');
+                const originalButtonText = submitButton.innerHTML;
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<span class="spinner"></span>문제 만드는 중...';
+                
+                try {
+                    const response = await fetch('${BACKEND_URL}/extract_keywords', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        // 파일 다운로드 링크 생성
+                        if (result.files) {
+                            // PDF 다운로드
+                            const pdfLink = document.createElement('a');
+                            pdfLink.href = `${BACKEND_URL}/download/${result.files.pdf.split('/').pop()}`;
+                            document.body.appendChild(pdfLink);
+                            pdfLink.click();
+                            document.body.removeChild(pdfLink);
+                        }
+
+                        submitButton.innerHTML = '✅ 완료!';
+                        
+                        // 3초 후 팝업 닫기
+                        setTimeout(() => {
+                            document.body.removeChild(popup);
+                        }, 3000);
+                    } else {
+                        submitButton.innerHTML = originalButtonText;
+                        submitButton.disabled = false;
+                        alert('문제 생성 중 오류가 발생했습니다: ' + result.error);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    submitButton.innerHTML = originalButtonText;
+                    submitButton.disabled = false;
+                    alert('문제 생성 중 오류가 발생했습니다.');
+                }
+            });
+        }
+        async function handleFileUpload(event) {
+            event.preventDefault();  // 폼 기본 제출 동작 방지
+            
+            // 1. 파일 선택 확인
+            const fileInput = document.getElementById('file-upload');
+            const messageDiv = document.getElementById('upload-message');
+            const file = fileInput.files[0];
+            
+            // 2. 파일 유효성 검사
+            if (!file) {
+                messageDiv.textContent = '파일을 선택해주세요.';
+                messageDiv.style.color = '#dc3545';
+                messageDiv.style.display = 'block';
+                return false;
+            }
+            
+            if (file.name.split('.').pop().toLowerCase() !== 'txt') {
+                messageDiv.textContent = 'txt 파일만 업로드 가능합니다.';
+                messageDiv.style.color = '#dc3545';
+                messageDiv.style.display = 'block';
+                return false;
+            }
+
+            // 3. API 정보 입력 팝업 생성
+            const popup = document.createElement('div');
+            popup.className = 'popup';
+            popup.innerHTML = `
+                <button class="close-button">&times;</button>
+                <h2>🔑 API 정보 입력</h2>
+                <form id="apiForm">
+                    <div class="form-group">
+                        <label for="api_key">API KEY</label>
+                        <input type="text" id="api_key" name="api_key" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="project_code">PROJECT CODE</label>
+                        <input type="text" id="project_code" name="project_code" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 mt-3">파일 업로드</button>
+                </form>
+            `;
+            document.body.appendChild(popup);
+
+            // 4. 팝업 닫기 버튼 이벤트
+            popup.querySelector('.close-button').addEventListener('click', () => {
+                document.body.removeChild(popup);
+            });
+
+            // 5. API 정보 제출 및 파일 업로드
+            popup.querySelector('#apiForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // 팝업의 제출 버튼을 로딩 상태로 변경
+            const submitButton = e.target.querySelector('button[type="submit"]');
+            const originalButtonText = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<span class="spinner"></span>파일 업로드 중...';
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('api_key', e.target.api_key.value);
+            formData.append('project_code', e.target.project_code.value);   
+            formData.append('collection_code', 'EX1');
+
+            try {
+                const response = await fetch('${BACKEND_URL}/file_upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    messageDiv.style.color = '#28a745';
+                    messageDiv.textContent = result.message;
+                    console.log('Update results:', result.update_results);
+
+                    // 문제 만들기 버튼 활성화 및 스타일 변경
+                    const makeProblemsBtn = document.getElementById('makeProblemsBtn');
+                    makeProblemsBtn.classList.remove('btn-disabled');
+                    makeProblemsBtn.classList.add('btn-gold');
+                    makeProblemsBtn.disabled = false;
+                    
+                    // 성공 시 팝업 닫기
+                    document.body.removeChild(popup);
+                } else {
+                    messageDiv.style.color = '#dc3545';
+                    messageDiv.textContent = result.error;
+                    // 실패 시 버튼 원래대로
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonText;
+                }
+                messageDiv.style.display = 'block';
+            } catch (error) {
+                console.error('Error:', error);
+                messageDiv.style.color = '#dc3545';
+                messageDiv.textContent = '파일 업로드 중 오류가 발생했습니다.';
+                messageDiv.style.display = 'block';
+                // 에러 시 버튼 원래대로
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonText;
+            }
+        });
+
+            return false;
+        }
+        
+    </script>
+</head>
+<body>
+    <div class="container-sm">
+        <!-- 제목과 아이콘 -->
+        <div class="header">
+            <h1>족발보쌈</h1>
+            <img src="족발보쌈누끼.png" alt="Icon" width="90">
+        </div>
+
+        <!-- 첫 번째 업로드 영역 -->
+        <div class="upload-container">
+            <div class="upload-icon">
+                <img src="https://cdn-icons-png.flaticon.com/512/3062/3062634.png" alt="Upload Icon" width="60">
+            </div>
+            <p class="upload-text">Drag & drop your file here or click to upload **txt 파일만 가능**</p>
+            <form id="uploadForm" onsubmit="return handleFileUpload(event)">
+                <label for="file-upload" class="custom-file-label">Choose File</label>
+                <input type="file" id="file-upload" name="file" class="custom-file-input" accept=".txt">
+                <button type="submit" class="btn btn-primary btn-upload">Upload</button>
+                <button type="button" class="btn btn-primary btn-disabled" id="makeProblemsBtn" onclick="handleSubmit(event)" disabled>문제 만들기</button>
+            </form>
+            <div id="upload-message" style="display: none;"></div>
+        </div>
+
+        
+    </div>
+</body>
+</html>
