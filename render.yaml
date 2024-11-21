@@ -2,7 +2,9 @@ services:
   - type: web
     name: flask-api
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      apt-get update && apt-get install -y python3-dev libfreetype6-dev
+      pip install -r requirements.txt
     startCommand: gunicorn flask_app:app
     envVars:
       - key: PYTHON_VERSION
