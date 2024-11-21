@@ -10,21 +10,20 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.pagesizes import A4
 import io
-from flask import render_template  # 상단에 추가
+from flask import render_template
 
 app = Flask(__name__)
 
 # CORS 설정
 CORS(app, resources={
     r"/*": {
-        "origins": ["*"],  # 프론트엔드 도메인으로 나중에 변경
+        "origins": ["*"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
         "supports_credentials": True
     }
 })
 
-# 기존 루트 경로 수정
 @app.route('/')
 def home():
     return render_template('prompton.html')
@@ -34,12 +33,6 @@ UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-# 업로드된 파일이 저장될 디렉토리 설정``
-UPLOAD_FOLDER = 'uploads'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-    
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # 허용할 파일 확장자 설정
@@ -102,10 +95,9 @@ def file_upload():
         if 'file' not in request.files:
             return jsonify({'error': '파일이 없습니다.'}), 400
         
-        # API 키와 프로젝트 코드 확인
         api_key = request.form.get('api_key')
         project_code = request.form.get('project_code')
-        collection_code = request.form.get('collection_code', 'EX1')  # 기본값 설정
+        collection_code = request.form.get('collection_code', 'EX1')
         
         if not api_key or not project_code:
             return jsonify({'error': 'API 키와 프로젝트 코드가 필요합니다.'}), 400
@@ -120,11 +112,9 @@ def file_upload():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
             
-            # 파일 내용 읽기
             with open(filepath, 'r', encoding='utf-8') as f:
                 file_content = f.read()
             
-            # API로 내용 전송
             update_results = split_and_update(
                 collection_code=collection_code,
                 base_doc_id="1",
@@ -187,7 +177,7 @@ def extract_keywords():
         
         # 2. 문제 생성
         workbook = []
-        progress_data = []  # 진행 상황을 저장할 리스트
+        progress_data = []
 
         print(f"\n총 {len(topics)}개의 주제에 대해 문제를 생성합니다...\n")
 
@@ -203,57 +193,63 @@ def extract_keywords():
                     "level": data['level'],
                     'keywords': keyword,
                     'topic': topic
-                },
-                "messages": [{"role": "user", "content": f"{topic}와 {keyword}를 이용해서 문제 만들어줘"}]
+                }
             }
-
-            problem_response = requests.post(url, headers=headers, json=problem_data)
             
-            response_data = problem_response.json()
-            # choices가 없거나 비어있는 경우 다음 반복으로 넘어감
-            if not response_data.get('choices'):
-                print(f"Warning: '{topic}' 주제에 대한 응답에 choices가 없습니다. 건너뜁니다.")
-                continue
+            response = requests.post(url, headers=headers, json=problem_data)
+            response.raise_for_status()
             
-            print(response_data['choices'][0]['message']['content'])
-            workbook.append(response_data['choices'][0]['message']['content'])
-
-            # 진행 상황 저장
+            result = response.json()['choices'][0]['message']['content']
+            workbook.append(result)
+            
             progress_data.append({
-                'current': idx,
-                'total': len(topics),
-                'subject': data['subject']
+                'topic': topic,
+                'status': 'completed'
             })
+            
+            print(f"[{idx}/{len(topics)}] '{topic}' 주제의 문제 생성 완료\n")
 
-       # 3. 문제, 답, 해설 분류
+        print("\n모든 주제에 대한 문제 생성이 완료되었습니다.")
+        
+        # 3. 문제 분류
         all_questions = []
         all_answers = []
         all_explanations = []
-
-        for entry in workbook:
-            try:
-                parts = entry.split("답:")
-                if len(parts) != 2:
+        
+        for problem_set in workbook:
+            lines = problem_set.strip().split('\n')
+            current_section = None
+            current_text = []
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                if line.startswith('[문제]'):
+                    if current_section == 'explanation' and current_text:
+                        all_explanations.append('\n'.join(current_text))
+                        current_text = []
+                    current_section = 'question'
+                    continue
+                elif line.startswith('[정답]'):
+                    if current_section == 'question' and current_text:
+                        all_questions.append('\n'.join(current_text))
+                        current_text = []
+                    current_section = 'answer'
+                    continue
+                elif line.startswith('[해설]'):
+                    if current_section == 'answer' and current_text:
+                        all_answers.append('\n'.join(current_text))
+                        current_text = []
+                    current_section = 'explanation'
                     continue
                 
-                question = parts[0].strip()
-                remaining = parts[1].split("해설:")
-                if len(remaining) != 2:
-                    continue
-                
-                answer = remaining[0].strip()
-                explanation = remaining[1].strip()
-                
-                all_questions.append(question)
-                all_answers.append(answer)
-                all_explanations.append(explanation)
-                
-            except Exception as e:
-                print(f"항목 처리 중 오류: {str(e)}")
-                continue
-
-        if not all_questions:
-            return jsonify({'error': '문제를 생성할 수 없습니다.'}), 500
+                current_text.append(line)
+            
+            # 마지막 섹션 처리
+            if current_section == 'explanation' and current_text:
+                all_explanations.append('\n'.join(current_text))
 
         print(f"\n=== 문제 분류 결과 ===")
         print(f"문제 수: {len(all_questions)}")
@@ -302,7 +298,6 @@ def extract_keywords():
         import traceback
         traceback.print_exc()
         return jsonify({'error': '문제 생성 중 오류가 발생했습니다.'}), 500
-        
 
 def create_pdf(questions, answers, explanations):
     print("\n=== PDF 생성 시작 ===")
@@ -424,8 +419,6 @@ def create_pdf(questions, answers, explanations):
     buffer.seek(0)
     return buffer
 
-
-# PDF 다운로드 엔드포인트 추가
 @app.route('/download/<filename>')
 def download_file(filename):
     try:
@@ -449,7 +442,7 @@ def download_file(filename):
             return send_file(
                 file_path,
                 as_attachment=True,
-                download_name=filename,  # 확장자가 포함된 파일명
+                download_name=filename,
                 mimetype='application/pdf'
             )
         except Exception as e:
@@ -459,4 +452,6 @@ def download_file(filename):
     except Exception as e:
         print(f"다운로드 처리 중 오류: {str(e)}")
         return jsonify({'error': f'파일 다운로드 오류: {str(e)}'}), 500
-    
+
+if __name__ == '__main__':
+    app.run(debug=True)
